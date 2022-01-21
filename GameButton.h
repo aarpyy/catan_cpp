@@ -23,7 +23,7 @@ public:
     GameButton(int x, int y, int w, int h, SDL_Texture *texture);
 
     // Overrider for delete to also delete rect
-    void operator delete(void*);
+    void operator delete(void *ptr);
 
     void show(SDL_Renderer *renderer);
     void hover(SDL_Renderer *renderer);

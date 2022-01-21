@@ -33,6 +33,7 @@
 #define N_VERTICES 54
 
 #define N_RESOURCE 6
+#define BLANK -1
 #define DESERT 0
 #define FIELD 1         // Grain
 #define FOREST 2        // Lumber

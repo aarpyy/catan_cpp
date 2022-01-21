@@ -43,6 +43,9 @@ public:
 
     // SDL textures to be displayed for each tile
     std::map<char, SDL_Texture*> tileTextures{};
+    // Texture for each chit number (2 - 12)
+    std::map<char, SDL_Texture*> chitTextures{};
+
     std::array<Tile*, N_TILES> tiles{};
     std::array<Vertex*, N_VERTICES> vertices{};
     std::array<int, N_RESOURCE> bitBoard{};

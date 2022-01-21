@@ -138,6 +138,13 @@ bool Board::findTextures() {
         }
     }
 
+    char buffer[100];
+    for (int i = 2; i <= 12; i++) {
+        sprintf(buffer, "resources/chits/chit_%d.bmp", i);
+        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
+        chitTextures.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
+    }
+
     // Also insert blank
     surface = SDL_LoadBMP("resources/hexes/blank.bmp");
     if (surface == nullptr) return false;
@@ -195,19 +202,6 @@ bool Board::findFonts() {
     } else {
         return true;
     }
-}
-
-bool Board::findChitNums() {
-    char buffer[100];
-    SDL_Surface *surface;
-    for (Tile* tile : tiles) {
-        if (tile->type == DESERT) continue;
-
-        sprintf(buffer, "resources/chits/chit_%d.bmp", tile->chitNum);
-        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
-        tile->chitTexture = SDL_CreateTextureFromSurface(renderer, surface);
-    }
-    return true;
 }
 
 void Board::initializePorts() {
@@ -362,11 +356,14 @@ void Board::setSize(int windowWidth, int windowHeight) {
     int tile_side = (int)(size / (6 * sqrt(3)));
     std::pair<int, int> center = std::make_pair(w / 2, h / 2);
 
-    std::pair<int, int> hex_coords;
+    std::pair<int, int> coords;
+
+    // Tile height = size / (3 * sqrt(3))
+    // Tile width = size / 6
 
     for (int i = 0; i < N_TILES; i++) {
-        hex_coords = Tile::position(i, center, size / 12, tile_side);
-        tiles[i]->setRect(hex_coords.first, hex_coords.second, size / 6, 2 * tile_side);
+        coords = Tile::position(i, center, size / 12, tile_side);
+        tiles[i]->setRect(coords.first, coords.second, size / 6, 2 * tile_side);
     }
 }
 
