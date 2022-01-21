@@ -56,8 +56,7 @@ Board::Board(std::array<int, N_RESOURCE> &bit_board) {
     resourceMenuRect = new SDL_Rect;
     vpRect = new SDL_Rect;
     portsRect = new SDL_Rect;
-
-    for (SDL_Texture* &t : diceRolls) t = nullptr;
+    robberRect = new SDL_Rect;
 
     w = h = 0;
 
@@ -84,6 +83,38 @@ Board::Board(std::array<int, N_RESOURCE> &bit_board) {
 }
 
 Board::Board() : Board(randBoard()) { }
+
+void *Board::operator new(size_t size) {
+    return ::operator new(size);
+}
+void Board::operator delete(void *ptr) {
+    auto *b = (Board*)ptr;
+    // Destroy all textures
+    for (auto const& value : b->tileTextures) {
+        SDL_DestroyTexture(value.second);
+    }
+
+    // Free all tiles and SDL_Rects
+    for (Tile* const& tile : b->tiles) {
+        delete tile;
+    }
+
+    // Free textures
+    for (char i = 2; i <= 12; i++) {
+        SDL_DestroyTexture(b->diceRolls.at(i));
+        SDL_DestroyTexture(b->chitTextures.at(i));
+    }
+
+    for (Vertex* const& vertex : b->vertices) delete vertex;
+
+    SDL_DestroyTexture(b->endTurnTexture);
+    delete b->endTurnButton;
+
+
+    TTF_CloseFont(b->SansLight);
+    TTF_CloseFont(b->SansMed);
+    TTF_CloseFont(b->SansBold);
+}
 
 std::array<int, N_RESOURCE> &Board::randBoard() {
     /*
@@ -130,41 +161,42 @@ bool Board::findTextures() {
             case PASTURE: surface = SDL_LoadBMP("resources/hexes/pasture.bmp"); break;
             default: break;
         }
-        if (surface == nullptr) {
-            return false;
-        } else {
-            // Creates a surface (collection of pixels with all of their metadata)
-            tileTextures.insert(std::make_pair(i, SDL_CreateTextureFromSurface(renderer, surface)));
-        }
-    }
-
-    char buffer[100];
-    for (int i = 2; i <= 12; i++) {
-        sprintf(buffer, "resources/chits/chit_%d.bmp", i);
-        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
-        chitTextures.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
+        if (surface == nullptr) return false;
+        // Creates a surface (collection of pixels with all of their metadata)
+        tileTextures.insert(std::make_pair(i, SDL_CreateTextureFromSurface(renderer, surface)));
+        SDL_FreeSurface(surface);
     }
 
     // Also insert blank
     surface = SDL_LoadBMP("resources/hexes/blank.bmp");
     if (surface == nullptr) return false;
     tileTextures.insert(std::make_pair(-1, SDL_CreateTextureFromSurface(renderer, surface)));
+    SDL_FreeSurface(surface);
+
+    // Insert each chit number mapped to its texture
+    char buffer[100];
+    for (int i = 2; i <= 12; i++) {
+        sprintf(buffer, "resources/chits/chit_%d.bmp", i);
+        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
+        chitTextures.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
+        SDL_FreeSurface(surface);
+
+        sprintf(buffer, "resources/dice/roll_%d.bmp", i);
+        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
+        diceRolls.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
+        SDL_FreeSurface(surface);
+    }
+
 
     // And rest of buttons
     surface = SDL_LoadBMP("resources/misc/end_turn_2.bmp");
     if (surface == nullptr) return false;
     endTurnTexture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
 
     surface = SDL_LoadBMP("resources/misc/building.bmp");
     if (surface == nullptr) return false;
     building = SDL_CreateTextureFromSurface(renderer, surface);
-
-    char buffer[100];
-    for (int i = 0; i < 11; i++) {
-        sprintf(buffer, "resources/dice/roll_%d.bmp", i + 2);
-        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
-        diceRolls[i] = SDL_CreateTextureFromSurface(renderer, surface);
-    }
 
     surface = SDL_LoadBMP("resources/cards/dev_back.bmp");
     if (surface == nullptr) return false;
@@ -311,7 +343,7 @@ bool Board::initialize() {
     SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
     // Get positions for all tiles
-    setSize(windowWidth, windowHeight);
+    resizeTiles();
 
     // Get size of tile
     int half_tile = tiles[0]->tileRect->w / 2;
@@ -347,28 +379,33 @@ bool Board::initialize() {
     return true;
 }
 
-void Board::setSize(int windowWidth, int windowHeight) {
-    w = windowWidth;
-    h = windowHeight;
-
+void Board::resizeTiles() {
     int size = std::min(w, h);
-    buttonBuffer = size / 24;
     int tile_side = (int)(size / (6 * sqrt(3)));
-    std::pair<int, int> center = std::make_pair(w / 2, h / 2);
-
-    std::pair<int, int> coords;
 
     // Tile height = size / (3 * sqrt(3))
     // Tile width = size / 6
 
+    buttonBuffer = size / 24;
+    robberRect->w = robberRect->h = size / 18;
+
+    std::pair<int, int> center = std::make_pair(w / 2, h / 2);
+    std::pair<int, int> coords;
     for (int i = 0; i < N_TILES; i++) {
         coords = Tile::position(i, center, size / 12, tile_side);
         tiles[i]->setRect(coords.first, coords.second, size / 6, 2 * tile_side);
+        if (tiles[i]->hasRobber) {
+            robberRect->x = tiles[i]->x;
+            robberRect->y = tiles[i]->y;
+        }
     }
 }
 
 void Board::resize(int windowWidth, int windowHeight) {
-    setSize(windowWidth, windowHeight);
+    w = windowWidth;
+    h = windowHeight;
+
+    resizeTiles();
     resizeButtons();
     resizeVertices();
 }
@@ -618,14 +655,7 @@ void Board::drawPlayerProperties(const std::vector<Player*>& players) {
 
 void Board::draw() {
 
-//    portsRect->h = std::min(h, w);
-//    portsRect->w = portsRect->h * 2;
-//    portsRect->y = 0;
-//    portsRect->x = portsRect->w / 11;
-//    SDL_RenderCopy(renderer, portsTexture, nullptr, portsRect);
-//    SDL_RenderDrawRect(renderer, portsRect);
-
-    int chitSize = w / 18;
+    int robberSize = w / 18;
     for (Tile* const& tile : tiles) {
         /*
          * Copies the tile texture to the renderer at the correct destination
@@ -633,14 +663,14 @@ void Board::draw() {
          * (hence the third NULL argument)
          */
         SDL_RenderCopy(renderer, tileTextures.at(tile->type), nullptr, tile->tileRect);
+        SDL_RenderDrawRect(renderer, tile->tileRect);
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
-        SDL_Rect chit{tile->x - chitSize, tile->y - chitSize, 2 * chitSize, 2 * chitSize};
-        SDL_RenderCopy(renderer, tile->chitTexture, nullptr, &chit);
-        SDL_RenderDrawRect(renderer, &chit);
+        SDL_RenderCopy(renderer, chitTextures.at(tile->chitNum), nullptr, tile->chitRect);
+        SDL_RenderDrawRect(renderer, tile->chitRect);
 
         if (tile->hasRobber) {
-            SDL_Rect robberRect{tile->x - (chitSize / 2), tile->y - (chitSize / 2), chitSize, chitSize};
+            SDL_Rect robberRect{tile->x - (robberSize / 2), tile->y - (robberSize / 2), robberSize, robberSize};
             SDL_RenderCopy(renderer, robberTexture, nullptr, &robberRect);
             SDL_RenderDrawRect(renderer, &robberRect);
         }

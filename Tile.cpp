@@ -30,6 +30,7 @@ void Tile::setRect(int _x, int _y, int _w, int _h) {
     x = _x;
     y = _y;
 
+    // Set width and height of tile rect
     tileRect->w = _w;
     tileRect->h = _h;
 
@@ -41,7 +42,7 @@ void Tile::setRect(int _x, int _y, int _w, int _h) {
     tileRect->y = _y - _h;
 
     // chitRect is square with size 1/3 of tile
-    _w = _h = _w / 3;
+    _w /= 3;
 
     chitRect->x = x - _w;
     chitRect->y = y - _w;

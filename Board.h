@@ -17,8 +17,6 @@ class Board {
     *buildCityTexture, *buyDevelopmentCardTexture, *confirmTexture, *cityTexture,
     *settlementTexture, *building, *rollDice, *resourceMenu, *robberTexture, *vpTexture, *portsTexture;
 
-    std::array<SDL_Texture*, 11> diceRolls{};
-
 public:
 
     int w, h;
@@ -29,7 +27,7 @@ public:
 
     SDL_Rect *endTurnButton, *buildOptionsRect, *buildRoadRect,
     *buildSettlementRect, *buildCityRect, *buyDevelopmentCardRect, *confirmRect, *buildingRect,
-    *rollDiceRect, *resourceMenuRect, *vpRect, *portsRect;
+    *rollDiceRect, *resourceMenuRect, *vpRect, *portsRect, *robberRect;
 
     /*
      * explicit keyword prevents the following instance:
@@ -45,6 +43,7 @@ public:
     std::map<char, SDL_Texture*> tileTextures{};
     // Texture for each chit number (2 - 12)
     std::map<char, SDL_Texture*> chitTextures{};
+    std::map<char, SDL_Texture*> diceRolls{};
 
     std::array<Tile*, N_TILES> tiles{};
     std::array<Vertex*, N_VERTICES> vertices{};
@@ -54,18 +53,20 @@ public:
 
     Board();
     explicit Board(std::array<int, N_RESOURCE> &bit_board);
+    void *operator new(size_t size);
+    void operator delete(void *ptr);
+
     static std::array<int, 6> & randBoard();
 
     bool findTextures();
     bool findFonts();
-    bool findChitNums();
     void initializePorts();
     void initializeMenu();
     void initializeButtons();
     bool initializeWindowAndRenderer();
     bool initialize();
 
-    void setSize(int windowWidth, int windowHeight);
+    void resizeTiles();
     void resize(int windowWidth, int windowHeight);
     void resizeMenu() const;
     void resizeButtons() const;
