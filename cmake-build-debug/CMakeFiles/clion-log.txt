@@ -1,4 +1,4 @@
-/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - Unix Makefiles" /Users/andrew/CLionProjects/catan_cpp
+/snap/clion/178/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/snap/clion/178/bin/ninja/linux/ninja -G Ninja /home/aarpyy/CLionProjects/catan_cpp
 -- Configuring done
 -- Generating done
--- Build files have been written to: /Users/andrew/CLionProjects/catan_cpp/cmake-build-debug
+-- Build files have been written to: /home/aarpyy/CLionProjects/catan_cpp/cmake-build-debug
