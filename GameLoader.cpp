@@ -1,14 +1,90 @@
 #include "GameLoader.h"
 
-#include <chrono>
-#include <random>
-
 GameLoader::GameLoader() {
     save_file = "saves/save";
-    for (int &i : board) i = 0;
+    board = nullptr;
 }
 
-bool GameLoader::runPlayerSelect() {
+bool GameLoader::runTitleScreen() {
+    bool start = false;
+    bool load = true;
+
+    if (SDL_Init(SDL_INIT_VIDEO)) {
+        SDL_Log("Error initializing title screen: %s", SDL_GetError());
+        return false;
+    }
+
+    // Set width and height to exact pixels of title screen image, not resizable
+    int w = 565;
+    int h = 692;
+    SDL_Window *window = SDL_CreateWindow("",
+                                          SDL_WINDOWPOS_UNDEFINED,
+                                          SDL_WINDOWPOS_UNDEFINED, w, h, 0);
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+    SDL_Surface *image = SDL_LoadBMP("resources/misc/title_screen.bmp");
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, image);
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+
+    int edge = 8;
+    int offset = 180;
+
+    // Title screen buttons
+    SDL_Rect startGameButton = {edge, 300, 200, 200};
+    SDL_Rect loadGameButton = {edge + offset, 300, 200, 200};
+    SDL_Rect quitGameButton = {edge + 2 * offset, 300, 200, 200};
+
+    SDL_Surface *startGameImage = SDL_LoadBMP("resources/misc/start_game.bmp");
+    SDL_Surface *loadGameImage = SDL_LoadBMP("resources/misc/load_game.bmp");
+    SDL_Surface *quitGameImage = SDL_LoadBMP("resources/misc/quit_game.bmp");
+
+    SDL_Texture *startGameTexture = SDL_CreateTextureFromSurface(renderer, startGameImage);
+    SDL_Texture *loadGameTexture = SDL_CreateTextureFromSurface(renderer, loadGameImage);
+    SDL_Texture *quitGameTexture = SDL_CreateTextureFromSurface(renderer, quitGameImage);
+
+    SDL_RenderCopy(renderer, startGameTexture, nullptr, &startGameButton);
+    SDL_RenderCopy(renderer, loadGameTexture, nullptr, &loadGameButton);
+    SDL_RenderCopy(renderer, quitGameTexture, nullptr, &quitGameButton);
+
+    SDL_RenderPresent(renderer);
+
+    SDL_Point mouse;
+    SDL_Event event;
+    while (!start && SDL_WaitEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                return false;
+            case SDL_MOUSEBUTTONDOWN:
+                SDL_GetMouseState(&mouse.x, &mouse.y);
+                if (encloses(startGameButton, mouse)) {
+                    start = true;
+                } else if (encloses(loadGameButton, mouse)) {
+                    load = true;
+                } else if (encloses(quitGameButton, mouse)) {
+                    return false;
+                }
+                break;
+        }
+    }
+
+    SDL_DestroyTexture(startGameTexture);
+    SDL_DestroyTexture(loadGameTexture);
+    SDL_DestroyTexture(quitGameTexture);
+    SDL_DestroyTexture(texture);
+
+    SDL_FreeSurface(startGameImage);
+    SDL_FreeSurface(loadGameImage);
+    SDL_FreeSurface(quitGameImage);
+    SDL_FreeSurface(image);
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+
+    board = new Board();
+    return true;
+}
+
+bool GameLoader::getPlayerInfo() {
     int w = 565;
     int h = 692;
 
@@ -133,44 +209,18 @@ bool GameLoader::runPlayerSelect() {
     return continueGame;
 }
 
-void GameLoader::randBoard() {
-    /*
-     * Generates a random board by iterating through the number of tiles and choosing a random
-     * tile to place there, checking first to see if any of those tiles are left to place.
-     * Seed is generated at beginning so that it's essentially a random board every time.
-     */
-
-    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine generator(seed);
-
-    // This is essentially Python's randrange(6)
-    std::uniform_int_distribution<int> distribution(0, 5);
-
-    // Get copy of constant array of number of each type of resource
-    std::array<int, N_RESOURCE> n_tiles{};
-    std::copy(nTypes.begin(), nTypes.end(), n_tiles.begin());
-
-    int i, t;
-    for (i = 0; i < N_TILES; i++) {
-
-        // Get tile that still has some left to be placed
-        t = distribution(generator);
-        while (!n_tiles[t]) t = ((t + 1) % N_RESOURCE);
-
-        board[t] |= (1 << i);
-        n_tiles[t]--;
-    }
-}
-
 void GameLoader::save() const {
     std::ofstream outfile(save_file);
-    for (const int &i : board) {
+    std::array<int, N_RESOURCE> bit_board = board->getBitBoard();
+    for (int& i : bit_board) {
         outfile << i << std::endl;
     }
     outfile.close();
 }
 
-void GameLoader::quit() const {
+void GameLoader::saveAndClose() const {
     save();
+    board->freeBoard();
+    delete board;
 }
 

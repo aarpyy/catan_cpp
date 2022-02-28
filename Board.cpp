@@ -1,3 +1,5 @@
+#include <chrono>
+#include <random>
 #include <cstring>
 
 #include "Board.h"
@@ -54,7 +56,8 @@ Board::Board(std::array<int, N_RESOURCE> &bit_board) {
     resourceMenuRect = new SDL_Rect;
     vpRect = new SDL_Rect;
     portsRect = new SDL_Rect;
-    robberRect = new SDL_Rect;
+
+    for (SDL_Texture* &t : diceRolls) t = nullptr;
 
     w = h = 0;
 
@@ -80,117 +83,112 @@ Board::Board(std::array<int, N_RESOURCE> &bit_board) {
     minHeight = 400;
 }
 
-void Board::free() {
-    // Destroy all textures
-    for (auto const& value : tileTextures) {
-        SDL_DestroyTexture(value.second);
+Board::Board() : Board(randBoard()) { }
+
+std::array<int, N_RESOURCE> &Board::randBoard() {
+    /*
+     * Generates a random board by iterating through the number of tiles and choosing a random
+     * tile to place there, checking first to see if any of those tiles are left to place.
+     * Seed is generated at beginning so that it's essentially a random board every time.
+     */
+
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator(seed);
+
+    // This is essentially Python's randrange(6)
+    std::uniform_int_distribution<int> distribution(0, 5);
+
+    // Get copy of constant array of number of each type of resource
+    std::array<int, N_RESOURCE> n_tiles{};
+    std::copy(nTypes.begin(), nTypes.end(), n_tiles.begin());
+
+    static std::array<int, N_RESOURCE> bit_board{0, 0, 0, 0, 0, 0};
+
+    int i, t;
+    for (i = 0; i < N_TILES; i++) {
+
+        // Get tile that still has some left to be placed
+        t = distribution(generator);
+        while (!n_tiles[t]) t = ((t + 1) % N_RESOURCE);
+
+        bit_board[t] |= (1 << i);
+        n_tiles[t]--;
     }
 
-    // Free all tiles and SDL_Rects
-    for (Tile* const& tile : tiles) {
-        delete tile;
-    }
-
-    // Free textures
-    for (char i = 2; i <= 12; i++) {
-        SDL_DestroyTexture(diceRolls.at(i));
-        if (i != 7) SDL_DestroyTexture(chitTextures.at(i));
-    }
-
-    for (Vertex* const& vertex : vertices) delete vertex;
-
-    SDL_DestroyTexture(endTurnTexture);
-    delete endTurnButton;
-    if (renderer != nullptr) SDL_DestroyRenderer(renderer);
-    if (window != nullptr) SDL_DestroyWindow(window);
-
-    TTF_CloseFont(SansLight);
-    TTF_CloseFont(SansMed);
-    TTF_CloseFont(SansBold);
-}
-
-void *Board::operator new(size_t size) {
-    return ::operator new(size);
-}
-
-void Board::operator delete(void *ptr) {
-    auto *b = (Board*)ptr;
-    b->free();
+    return bit_board;
 }
 
 bool Board::findTextures() {
     SDL_Surface *surface;
     for (const char& i : types) {
         switch (i) {
-            case DESERT: surface = SDL_LoadBMP("../resources/hexes/desert.bmp"); break;
-            case FIELD: surface = SDL_LoadBMP("../resources/hexes/field.bmp"); break;
-            case FOREST: surface = SDL_LoadBMP("../resources/hexes/forest.bmp"); break;
-            case HILL: surface = SDL_LoadBMP("../resources/hexes/hill.bmp"); break;
-            case MOUNTAIN: surface = SDL_LoadBMP("../resources/hexes/mountain.bmp"); break;
-            case PASTURE: surface = SDL_LoadBMP("../resources/hexes/pasture.bmp"); break;
+            case DESERT: surface = SDL_LoadBMP("resources/hexes/desert.bmp"); break;
+            case FIELD: surface = SDL_LoadBMP("resources/hexes/field.bmp"); break;
+            case FOREST: surface = SDL_LoadBMP("resources/hexes/forest.bmp"); break;
+            case HILL: surface = SDL_LoadBMP("resources/hexes/hill.bmp"); break;
+            case MOUNTAIN: surface = SDL_LoadBMP("resources/hexes/mountain.bmp"); break;
+            case PASTURE: surface = SDL_LoadBMP("resources/hexes/pasture.bmp"); break;
             default: break;
         }
-        if (surface == nullptr) return false;
-        // Creates a surface (collection of pixels with all of their metadata)
-        tileTextures.insert(std::make_pair(i, SDL_CreateTextureFromSurface(renderer, surface)));
-        SDL_FreeSurface(surface);
+        if (surface == nullptr) {
+            return false;
+        } else {
+            // Creates a surface (collection of pixels with all of their metadata)
+            textures.insert(std::make_pair(i, SDL_CreateTextureFromSurface(renderer, surface)));
+        }
     }
 
     // Also insert blank
-    surface = SDL_LoadBMP("../resources/hexes/blank.bmp");
-    if (surface == nullptr) return false;
-    tileTextures.insert(std::make_pair(-1, SDL_CreateTextureFromSurface(renderer, surface)));
-    SDL_FreeSurface(surface);
-
-    // Insert each chit number mapped to its texture
-    char buffer[100];
-    for (int i = 2; i <= 12; i++) {
-
-        // Don't load chit 7 since that doesn't exist
-        if (i != 7) {
-            sprintf(buffer, "../resources/chits/chit_%d.bmp", i);
-            if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
-            chitTextures.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
-            SDL_FreeSurface(surface);
-        }
-
-        sprintf(buffer, "../resources/dice/roll_%d.bmp", i);
-        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
-        diceRolls.emplace(i, SDL_CreateTextureFromSurface(renderer, surface));
-        SDL_FreeSurface(surface);
+    surface = SDL_LoadBMP("resources/hexes/blank.bmp");
+    if (surface == nullptr) {
+        return false;
+    } else {
+        textures.insert(std::make_pair(-1, SDL_CreateTextureFromSurface(renderer, surface)));
     }
 
     // And rest of buttons
-    surface = SDL_LoadBMP("../resources/misc/end_turn_2.bmp");
-    if (surface == nullptr) return false;
-    endTurnTexture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
+    surface = SDL_LoadBMP("resources/misc/end_turn_2.bmp");
+    if (surface == nullptr) {
+        return false;
+    } else {
+        endTurnTexture = SDL_CreateTextureFromSurface(renderer, surface);
+    }
 
-    surface = SDL_LoadBMP("../resources/misc/building.bmp");
-    if (surface == nullptr) return false;
-    building = SDL_CreateTextureFromSurface(renderer, surface);
+    surface = SDL_LoadBMP("resources/misc/building.bmp");
+    if (surface == nullptr) {
+        return false;
+    } else {
+        building = SDL_CreateTextureFromSurface(renderer, surface);
+    }
 
-    surface = SDL_LoadBMP("../resources/cards/dev_back.bmp");
+    char buffer[100];
+    for (int i = 0; i < 11; i++) {
+        sprintf(buffer, "resources/dice/roll_%d.bmp", i + 2);
+        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
+        diceRolls[i] = SDL_CreateTextureFromSurface(renderer, surface);
+    }
+
+    surface = SDL_LoadBMP("resources/cards/dev_back.bmp");
     if (surface == nullptr) return false;
     devCardBack = SDL_CreateTextureFromSurface(renderer, surface);
 
-    surface = SDL_LoadBMP("../resources/dice/dice_6.bmp");
+    surface = SDL_LoadBMP("resources/dice/dice_6.bmp");
     if (surface == nullptr) return false;
     rollDice = SDL_CreateTextureFromSurface(renderer, surface);
 
-    surface = SDL_LoadBMP("../resources/misc/resource_menu.bmp");
+    surface = SDL_LoadBMP("resources/misc/resource_menu.bmp");
     if (surface == nullptr) return false;
     resourceMenu = SDL_CreateTextureFromSurface(renderer, surface);
 
-    surface = SDL_LoadBMP("../resources/misc/robber.bmp");
+    surface = SDL_LoadBMP("resources/misc/robber.bmp");
     if (surface == nullptr) return false;
     robberTexture = SDL_CreateTextureFromSurface(renderer, surface);
 
-    surface = SDL_LoadBMP("../resources/misc/victory_points.bmp");
+    surface = SDL_LoadBMP("resources/misc/victory_points.bmp");
     if (surface == nullptr) return false;
     vpTexture = SDL_CreateTextureFromSurface(renderer, surface);
 
-    surface = SDL_LoadBMP("../resources/ports/port_bridges_with_ports.bmp");
+    surface = SDL_LoadBMP("resources/ports/port_bridges_with_ports.bmp");
     if (surface == nullptr) return false;
     portsTexture = SDL_CreateTextureFromSurface(renderer, surface);
 
@@ -198,14 +196,27 @@ bool Board::findTextures() {
 }
 
 bool Board::findFonts() {
-    SansLight = TTF_OpenFont("../resources/fonts/OpenSans-Light.ttf", fontSize);
-    SansMed = TTF_OpenFont("../resources/fonts/OpenSans-Medium.ttf", fontSize);
-    SansBold = TTF_OpenFont("../resources/fonts/OpenSans-Bold.ttf", fontSize);
+    SansLight = TTF_OpenFont("fonts/OpenSans-Light.ttf", fontSize);
+    SansMed = TTF_OpenFont("fonts/OpenSans-Medium.ttf", fontSize);
+    SansBold = TTF_OpenFont("fonts/OpenSans-Bold.ttf", fontSize);
     if ((SansLight == nullptr) || (SansMed == nullptr) || (SansBold == nullptr)) {
         return false;
     } else {
         return true;
     }
+}
+
+bool Board::findChitNums() {
+    char buffer[100];
+    SDL_Surface *surface;
+    for (Tile* tile : tiles) {
+        if (tile->type == DESERT) continue;
+
+        sprintf(buffer, "resources/chits/chit_%d.bmp", tile->chitNum);
+        if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
+        tile->chitTexture = SDL_CreateTextureFromSurface(renderer, surface);
+    }
+    return true;
 }
 
 void Board::initializePorts() {
@@ -315,7 +326,7 @@ bool Board::initialize() {
     SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
     // Get positions for all tiles
-    resizeTiles();
+    setSize(windowWidth, windowHeight);
 
     // Get size of tile
     int half_tile = tiles[0]->tileRect->w / 2;
@@ -346,36 +357,30 @@ bool Board::initialize() {
         for (int const& j : Tile::adjacentVertices(i)) tiles[i]->vertices.push_back(j);
     }
 
+    if (!findChitNums()) return false;
+
     return true;
 }
 
-void Board::resizeTiles() {
+void Board::setSize(int windowWidth, int windowHeight) {
+    w = windowWidth;
+    h = windowHeight;
+
     int size = std::min(w, h);
-    int tile_side = (int)(size / (6 * sqrt(3)));
-
-    // Tile height = size / (3 * sqrt(3))
-    // Tile width = size / 6
-
     buttonBuffer = size / 24;
-    robberRect->w = robberRect->h = size / 18;
-
+    int tile_side = (int)(size / (6 * sqrt(3)));
     std::pair<int, int> center = std::make_pair(w / 2, h / 2);
-    std::pair<int, int> coords;
+
+    std::pair<int, int> hex_coords;
+
     for (int i = 0; i < N_TILES; i++) {
-        coords = Tile::position(i, center, size / 12, tile_side);
-        tiles[i]->setRect(coords.first, coords.second, size / 6, 2 * tile_side);
-        if (tiles[i]->hasRobber) {
-            robberRect->x = tiles[i]->x;
-            robberRect->y = tiles[i]->y;
-        }
+        hex_coords = Tile::position(i, center, size / 12, tile_side);
+        tiles[i]->setRect(hex_coords.first, hex_coords.second, size / 6, 2 * tile_side);
     }
 }
 
 void Board::resize(int windowWidth, int windowHeight) {
-    w = windowWidth;
-    h = windowHeight;
-
-    resizeTiles();
+    setSize(windowWidth, windowHeight);
     resizeButtons();
     resizeVertices();
 }
@@ -625,23 +630,29 @@ void Board::drawPlayerProperties(const std::vector<Player*>& players) {
 
 void Board::draw() {
 
-    int robberSize = w / 18;
+//    portsRect->h = std::min(h, w);
+//    portsRect->w = portsRect->h * 2;
+//    portsRect->y = 0;
+//    portsRect->x = portsRect->w / 11;
+//    SDL_RenderCopy(renderer, portsTexture, nullptr, portsRect);
+//    SDL_RenderDrawRect(renderer, portsRect);
+
+    int chitSize = w / 18;
     for (Tile* const& tile : tiles) {
-        if (tile->type == DESERT) continue;
         /*
          * Copies the tile texture to the renderer at the correct destination
          * position specified in hex_pos using the entire source texture
          * (hence the third NULL argument)
          */
-        SDL_RenderCopy(renderer, tileTextures.at(tile->type), nullptr, tile->tileRect);
-        SDL_RenderDrawRect(renderer, tile->tileRect);
+        SDL_RenderCopy(renderer, textures.at(tile->type), nullptr, tile->tileRect);
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
-        SDL_RenderCopy(renderer, chitTextures.at(tile->chitNum), nullptr, tile->chitRect);
-        SDL_RenderDrawRect(renderer, tile->chitRect);
+        SDL_Rect chit{tile->x - chitSize, tile->y - chitSize, 2 * chitSize, 2 * chitSize};
+        SDL_RenderCopy(renderer, tile->chitTexture, nullptr, &chit);
+        SDL_RenderDrawRect(renderer, &chit);
 
         if (tile->hasRobber) {
-            SDL_Rect robberRect{tile->x - (robberSize / 2), tile->y - (robberSize / 2), robberSize, robberSize};
+            SDL_Rect robberRect{tile->x - (chitSize / 2), tile->y - (chitSize / 2), chitSize, chitSize};
             SDL_RenderCopy(renderer, robberTexture, nullptr, &robberRect);
             SDL_RenderDrawRect(renderer, &robberRect);
         }
@@ -658,4 +669,30 @@ void Board::draw() {
     }
 
     drawButtons();
+}
+
+void Board::freeBoard() {
+
+    // Destroy all textures
+    for (auto const& value : textures) {
+        SDL_DestroyTexture(value.second);
+    }
+
+    // Free all tiles and SDL_Rects
+    for (Tile* const& tile : tiles) {
+        delete tile->tileRect;
+        delete tile;
+    }
+
+    for (Vertex* const& vertex : vertices) delete vertex;
+
+    SDL_DestroyTexture(endTurnTexture);
+    delete endTurnButton;
+    TTF_CloseFont(SansLight);
+    TTF_CloseFont(SansMed);
+    TTF_CloseFont(SansBold);
+}
+
+std::array<int, N_RESOURCE> Board::getBitBoard() const {
+    return bitBoard;
 }

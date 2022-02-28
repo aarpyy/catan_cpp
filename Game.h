@@ -1,6 +1,7 @@
 #ifndef CATAN_GAME_H
 #define CATAN_GAME_H
 
+#include "Board.h"
 #include "GameLoader.h"
 
 #include <chrono>
@@ -19,8 +20,7 @@ class Game {
 
     std::vector<Player*> players;
     Player *player;
-    unsigned int frameLimit, frameRate;
-    int activePlayer, nPlayers, nDevelopmentCards, primaryVertex, secondaryVertex;
+    int frameRate, frameLimit, activePlayer, nPlayers, nDevelopmentCards, primaryVertex, secondaryVertex;
     std::array<Uint8, 3> renderColor{0, 84, 119};
     std::array<Uint8, 3> harborColor{74, 183, 197};
     Uint32 tick;
@@ -60,7 +60,7 @@ public:
     void confirmUserAction();
     void handleMouseDown();
     void handleKeyPress(SDL_KeyboardEvent &keyEvent);
-    void quit();
+    void close();
 };
 
 

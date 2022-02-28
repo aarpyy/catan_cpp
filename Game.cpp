@@ -4,14 +4,11 @@
 
 
 Game::Game(GameLoader *g, int r) {
+    board = g->board;
+    SDL_Log("Board is null: %d", (board == nullptr));
     gameLoader = g;
-    board = new Board(g->board);
-
-    // Set maximum frame-rate to r, then get minimum time in ms to display each frame
     frameRate = r;
     frameLimit = 1000 / frameRate;
-
-
     nDevelopmentCards = N_DEV_CARD;
     activePlayer = primaryVertex = secondaryVertex = -1;
     nPlayers = diceRoll = 0;
@@ -51,7 +48,7 @@ Player *Game::nextPlayer() {
         }
     }
     // If setup going backwards, go until first player, then switch to normal direction
-    else {
+    else if (direction == -1) {
         if (!activePlayer) {
             direction = 0;
             next = players[activePlayer];
@@ -143,25 +140,23 @@ void Game::updateDisplay() {
 
 void Game::updateAndRender() {
     updateDisplay();
+    SDL_RenderPresent(board->renderer);
 
     // Update time since last render s.t. the framerate is limited to macro FPS
     checkFrameTime();
-    SDL_RenderPresent(board->renderer);
 
     for (Player* p : players) {
         if (p->victoryPoints == 3) {
             SDL_Log("Player %d wins!", p->id);
-            quit();
+            close();
         }
     }
 }
 
 void Game::checkFrameTime() {
-
-    // Time that most recent frame has been presented for
-    unsigned int timeLastFrame = SDL_GetTicks() - tick;
-    if (timeLastFrame < frameLimit) {
-        SDL_Delay(frameLimit - timeLastFrame);
+    int tick_delta = (int)(SDL_GetTicks() - tick);
+    if (tick_delta < frameLimit) {
+        SDL_Delay(frameLimit - tick_delta);
     }
     tick = SDL_GetTicks();
 }
@@ -313,7 +308,7 @@ void Game::start() {
     } else {
         if (!initializeBoard()) {
             SDL_Log("Error loading resources\n");
-            quit();
+            close();
         } else {
             direction = 1;
             activePlayer = 0;
@@ -539,11 +534,60 @@ void Game::handleKeyPress(SDL_KeyboardEvent &keyEvent) {
     updateAndRender();
 }
 
-void Game::quit() {
+void Game::close() {
     // Allows freeing the allocated renderer and window data if necessary
+    if (board->renderer) {
+        SDL_DestroyRenderer(board->renderer);
+        SDL_Log("Renderer destroyed\n");
+    }
+    if (board->window) {
+        SDL_DestroyWindow(board->window);
+        SDL_Log("Window destroyed\n");
+    }
+
     // This saves game and frees everything
-    gameLoader->quit();
+    gameLoader->saveAndClose();
 
     TTF_Quit();
     SDL_Quit();
+}
+
+int main() {
+    GameLoader loader;
+
+    if (!loader.runTitleScreen()) {
+        return 3;
+    } else if (!loader.getPlayerInfo()) {
+        return 4;
+    }
+
+    // If want to jump into game no testing, uncomment this
+    //    SDL_Init(SDL_INIT_VIDEO);
+    //    loader.players.push_back(new Player(1, RUSSET));
+    //    loader.players.push_back(new Player(2, BLUE));
+    //    loader.board = new Board();
+
+    Game game(&loader);
+
+    SDL_Log("Constructed game");
+
+    if (!game.initialize()) {
+        SDL_Log("Error initializing board: %s\n", SDL_GetError());
+        return 1;
+    }
+    SDL_Log("Board initialized");
+    if (!game.initializeTTF()) {
+        SDL_Log("Error initializing TTF library: %s\n", SDL_GetError());
+        return 2;
+    }
+    if (!game.initializePlayerTextures()) {
+        SDL_Log("Error initializing player textures: %s", SDL_GetError());
+        return 5;
+    }
+
+    SDL_Log("Starting game");
+    game.start();
+    game.close();
+
+    return 0;
 }

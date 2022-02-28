@@ -1,3 +1,5 @@
 .idea
 resources/.DS_Store
 /resources/
+SDL/
+SDL_ttf/

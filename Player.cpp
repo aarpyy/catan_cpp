@@ -17,7 +17,7 @@ Player::Player(int _id, Uint8 r, Uint8 g, Uint8 b) {
     for (int &i : resources) i = 0;
 
     char buffer[100];
-    sprintf(buffer, "../resources/cursors/cursor_%d.bmp", id);
+    sprintf(buffer, "resources/cursors/cursor_%d.bmp", id);
     SDL_Surface *surface = SDL_LoadBMP(buffer);
     if (surface == nullptr) {
         cursor = SDL_GetDefaultCursor();
@@ -38,18 +38,18 @@ bool Player::loadTextures(SDL_Renderer *renderer) {
     char buffer[100];
     SDL_Surface *surface;
     for (int i = 0; i < 3; i++) {
-        sprintf(buffer, "../resources/roads/road_%d_angle_%d.bmp", id, i + 1);
+        sprintf(buffer, "resources/roads/road_%d_angle_%d.bmp", id, i + 1);
         if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
         roadTextures[i] = SDL_CreateTextureFromSurface(renderer, surface);
     }
 
     // Load settlement texture
-    sprintf(buffer, "../resources/buildings/settlement_%d.bmp", id);
+    sprintf(buffer, "resources/buildings/settlement_%d.bmp", id);
     if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
     settlementTexture = SDL_CreateTextureFromSurface(renderer, surface);
 
     // Load city texture
-    sprintf(buffer, "../resources/buildings/city_%d.bmp", id);
+    sprintf(buffer, "resources/buildings/city_%d.bmp", id);
     if ((surface = SDL_LoadBMP(buffer)) == nullptr) return false;
     cityTexture = SDL_CreateTextureFromSurface(renderer, surface);
 

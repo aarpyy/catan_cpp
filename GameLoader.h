@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "Board.h"
+#include "Tile.h"
 
 /*
  * GameLoader class can take in either a filename to load from or a board to load from.
@@ -16,18 +17,15 @@ class GameLoader {
 
 public:
 
+    Board *board;
     std::string save_file;
     std::vector<Player*> players;
-    std::array<int, N_RESOURCE> board{};
 
     GameLoader();
-
-    bool runPlayerSelect();
-
-    void randBoard();
-
+    bool runTitleScreen();
+    bool getPlayerInfo();
     void save() const;
-    void quit() const;
+    void saveAndClose() const;
 };
 
 

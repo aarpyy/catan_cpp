@@ -6,47 +6,18 @@ Tile::Tile(char t, char c) {
     hasRobber = false;
     x = y = 0;
     tileRect = new SDL_Rect;
-    chitRect = new SDL_Rect;
+    chitTexture = nullptr;
 }
 
-Tile::Tile() : Tile(BLANK, 0) { }
-
-void Tile::freeTile() const {
-    delete tileRect;
-    delete chitRect;
-}
-
-void *Tile::operator new(size_t size) {
-    return ::operator new(size);
-}
-
-void Tile::operator delete(void *ptr) {
-    Tile *tile = (Tile*)ptr;
-    tile->freeTile();
-    free(ptr);
-}
+Tile::Tile() : Tile(-1, 0) { }
 
 void Tile::setRect(int _x, int _y, int _w, int _h) {
     x = _x;
     y = _y;
-
-    // Set width and height of tile rect
+    tileRect->x = _x - (_w / 2);
+    tileRect->y = _y - (_h / 2);
     tileRect->w = _w;
     tileRect->h = _h;
-
-    // Cut in half for adjustment
-    _w /= 2;
-    _h /= 2;
-
-    tileRect->x = _x - _w;
-    tileRect->y = _y - _h;
-
-    // chitRect is square with size 1/3 of tile
-    _w /= 3;
-
-    chitRect->x = x - _w;
-    chitRect->y = y - _w;
-    chitRect->w = chitRect->h = (2 * _w);
 }
 
 std::pair<int, int> Tile::position(int pos, std::pair<int, int> center, int half_tile, int tile_side) {
