@@ -1,5 +1,10 @@
-.idea
-resources/.DS_Store
-/resources/
-SDL/
-SDL_ttf/
+SDL
+SDL_ttf
+Player.o
+game_utility.o
+Vertex.o
+GameLoader.o
+Tile.o
+Board.o
+Game
+.idea/
